@@ -1,0 +1,11 @@
+#+OPTIONS: toc:nil
+
+* codegeex.el
+
+[[https://github.com/hzhangxyz/codegeex.el][codegeex.el]] provide completion drived by [[https://codegeex.cn/][CodeGeeX]] API.
+Please notice that the API replies on reverse engineering
+on the [[https://marketplace.visualstudio.com/items?itemName=aminer.codegeex][vscode extension]] so that may be broken in the future.
+
+** Usage
+
+The keybind is =M-\=, which follow the behavior in the vscode extension.
