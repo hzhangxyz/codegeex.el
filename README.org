@@ -9,3 +9,5 @@ on the [[https://marketplace.visualstudio.com/items?itemName=aminer.codegeex][vs
 ** Usage
 
 The keybind is =M-\=, which follow the behavior in the vscode extension.
+
+[[https://asciinema.org/a/601782][https://asciinema.org/a/601782.svg]]
