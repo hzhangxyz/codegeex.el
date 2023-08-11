@@ -8,6 +8,11 @@ on the [[https://marketplace.visualstudio.com/items?itemName=aminer.codegeex][vs
 
 ** Usage
 
-The keybind is =M-\=, which follow the behavior in the vscode extension.
+|------------------------------+-----------------------------------------------+---------|
+| function                     | usage                                         | keybind |
+|------------------------------+-----------------------------------------------+---------|
+| =codegeex-buffer-completion= | Complete at cursor based on the whole buffer  | =M-\=   |
+| =codegeex-buffer-debug=      | Debug the selected region or the whole buffer |         |
+|------------------------------+-----------------------------------------------+---------|
 
 [[https://asciinema.org/a/601782][https://asciinema.org/a/601782.svg]]
