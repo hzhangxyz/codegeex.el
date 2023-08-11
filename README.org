@@ -8,11 +8,12 @@ on the [[https://marketplace.visualstudio.com/items?itemName=aminer.codegeex][vs
 
 ** Usage
 
-|------------------------------+-----------------------------------------------+---------|
-| function                     | usage                                         | keybind |
-|------------------------------+-----------------------------------------------+---------|
-| =codegeex-buffer-completion= | Complete at cursor based on the whole buffer  | =M-\=   |
-| =codegeex-buffer-debug=      | Debug the selected region or the whole buffer |         |
-|------------------------------+-----------------------------------------------+---------|
+|------------------------------+----------------------------------------------+---------|
+| function                     | usage                                        | keybind |
+|------------------------------+----------------------------------------------+---------|
+| =codegeex-buffer-completion= | Complete at cursor based on the whole buffer | =M-\=   |
+| =codegeex-buffer-debug=      | Debug the whole buffer                       |         |
+| =codegeex-region-debug=      | Debug the selected region                    |         |
+|------------------------------+----------------------------------------------+---------|
 
 [[https://asciinema.org/a/601782][https://asciinema.org/a/601782.svg]]
