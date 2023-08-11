@@ -156,7 +156,8 @@ The result will be replaced into the selected region."
     (codegeex-debug-invoke prompt (codegeex-language) begin end))
   nil)
 
-(keymap-global-set "M-\\" 'codegeex-buffer-completion)
+;;;###autoload
+(define-key global-map (kbd "M-\\") 'codegeex-buffer-completion)
 
 (provide 'codegeex)
 ;;; codegeex.el ends here
