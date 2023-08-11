@@ -32,6 +32,7 @@
 (require 'json)
 (require 'uuidgen)
 
+(defvar codegeex-endpoint "https://tianqi.aminer.cn/api/v2/" "the endpoint of CodeGeeX API")
 (defvar codegeex-apikey "68cf004321e94b47a91c2e45a8109852" "API key obtained from CodeGeeX website")
 (defvar codegeex-apisecret "e82b86a16f9d471ab215f653060310e3" "API secret obtained from CodeGeeX website")
 (defvar codegeex-temperature 0.2 "temperature for completion by CodeGeeX")
@@ -47,7 +48,7 @@
 This function will complete code between PREFIX and SUFFIX, which are usually
 the content before cursor and after cursor, and put the result to the current
 buffer. LANG is the programming lanuauge of the code."
-  (let* ((url "https://tianqi.aminer.cn/api/v2/multilingual_code_generate_adapt")
+  (let* ((url (concat codegeex-endpoint "multilingual_code_generate_adapt"))
          (data (json-encode `((prompt . ,prefix)
                               (suffix . ,suffix)
                               (n . 1)
@@ -87,7 +88,7 @@ buffer. LANG is the programming lanuauge of the code."
 PROMPT is the code content to be debugged. LANG is the programming language name
 of the code. The result will be replaced between BEGIN and END in the current
 buffer."
-  (let* ((url "https://tianqi.aminer.cn/api/v2/multilingual_code_bugfix")
+  (let* ((url (concat codegeex-endpoint "multilingual_code_bugfix"))
          (data (json-encode `((prompt . ,prompt)
                               (n . 1)
                               (apikey . ,codegeex-apikey)
