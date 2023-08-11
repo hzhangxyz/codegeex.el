@@ -64,12 +64,18 @@
          (kill-buffer)))
      `(,(current-buffer)))))
 
+(defun codegeex-language ()
+  (interactive)
+  (let* ((name (symbol-name major-mode))
+         (name-without-mode (replace-regexp-in-string "-mode" "" name)))
+    name-without-mode))
+
 (defun codegeex-buffer-completion ()
   (interactive)
   (message "CodeGeeX completing")
   (let ((prefix (buffer-substring (point-min) (point)))
         (suffix (buffer-substring (point) (point-max))))
-    (codegeex-completion prefix suffix major-mode)))
+    (codegeex-completion prefix suffix (codegeex-language))))
 
 (keymap-global-set "M-\\" 'codegeex-buffer-completion)
 
