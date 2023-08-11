@@ -64,6 +64,35 @@
          (kill-buffer)))
      `(,(current-buffer)))))
 
+(defun codegeex-debug (prompt lang begin end)
+  (let* ((url "https://tianqi.aminer.cn/api/v2/multilingual_code_bugfix")
+         (data (json-encode `((prompt . ,prompt)
+                              (n . 1)
+                              (apikey . "68cf004321e94b47a91c2e45a8109852")
+                              (apisecret . "e82b86a16f9d471ab215f653060310e3")
+                              (lang . ,lang))))
+         (url-request-method "POST")
+         (url-request-extra-headers
+          '(("Content-Type" . "application/json")))
+         (url-request-data data))
+    (url-retrieve
+     url
+     (lambda (status parent-buffer begin end)
+       (goto-char (point-min))
+       (re-search-forward "^$")
+       (delete-region (point) (point-min))
+       (let* ((json-string (buffer-string))
+              (json-data (json-read-from-string json-string))
+              (json-result (assoc-default 'result json-data))
+              (json-output (assoc-default 'output json-result))
+              (json-code (assoc-default 'code json-output))
+              (result (aref json-code 0)))
+         (with-current-buffer parent-buffer
+           (delete-region begin end)
+           (insert result))
+         (kill-buffer)))
+     `(,(current-buffer) ,begin ,end))))
+
 (defun codegeex-language ()
   (interactive)
   (let* ((name (symbol-name major-mode))
@@ -76,6 +105,19 @@
   (let ((prefix (buffer-substring (point-min) (point)))
         (suffix (buffer-substring (point) (point-max))))
     (codegeex-completion prefix suffix (codegeex-language))))
+
+(defun codegeex-buffer-debug ()
+  (interactive)
+  (message "CodeGeeX debugging")
+  (if (use-region-p)
+      (let* ((begin (region-beginning))
+             (end (region-end))
+             (prompt (buffer-substring begin end)))
+        (codegeex-debug prompt (codegeex-language) begin end))
+    (let* ((begin (point-min))
+           (end (point-max))
+           (prompt (buffer-substring begin end)))
+      (codegeex-debug prompt (codegeex-language) begin end))))
 
 (keymap-global-set "M-\\" 'codegeex-buffer-completion)
 
