@@ -30,12 +30,16 @@
 
 (require 'url)
 (require 'json)
+(require 'uuidgen)
 
 (defvar codegeex-apikey "68cf004321e94b47a91c2e45a8109852" "API key obtained from CodeGeeX website")
 (defvar codegeex-apisecret "e82b86a16f9d471ab215f653060310e3" "API secret obtained from CodeGeeX website")
 (defvar codegeex-temperature 0.2 "temperature for completion by CodeGeeX")
 (defvar codegeex-top_p 0.95 "top_p for completion by CodeGeeX")
 (defvar codegeex-top_k 0 "top_k for completion by CodeGeeX")
+(defvar codegeex-extinfo `((sid . ,(uuidgen-4))
+                           (ide . "Emacs")
+                           (ideVersion . ,emacs-version)) "The ext field in JSON to be sent to server")
 
 (defun codegeex-completion-invoke (prefix suffix lang)
   "Invoke CodeGeeX completion API.
@@ -53,7 +57,8 @@ buffer. LANG is the programming lanuauge of the code."
                               (top_p . ,codegeex-top_p)
                               (top_k . ,codegeex-top_k)
                               (isFimEnabled . ,(not (equal suffix "")))
-                              (lang . ,lang))))
+                              (lang . ,lang)
+                              (ext . ,codegeex-extinfo))))
          (url-request-method "POST")
          (url-request-extra-headers
           '(("Content-Type" . "application/json")))
@@ -87,7 +92,8 @@ buffer."
                               (n . 1)
                               (apikey . ,codegeex-apikey)
                               (apisecret . ,codegeex-apisecret)
-                              (lang . ,lang))))
+                              (lang . ,lang)
+                              (ext . ,codegeex-extinfo))))
          (url-request-method "POST")
          (url-request-extra-headers
           '(("Content-Type" . "application/json")))
