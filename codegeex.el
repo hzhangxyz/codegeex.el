@@ -102,6 +102,7 @@
          (name-without-mode (replace-regexp-in-string "-mode" "" name)))
     name-without-mode))
 
+;;;###autoload
 (defun codegeex-buffer-completion ()
   (interactive)
   (message "CodeGeeX completing")
@@ -109,6 +110,7 @@
         (suffix (buffer-substring (point) (point-max))))
     (codegeex-completion-invoke prefix suffix (codegeex-language))))
 
+;;;###autoload
 (defun codegeex-buffer-debug ()
   (interactive)
   (message "CodeGeeX debugging")
@@ -117,6 +119,7 @@
          (prompt (buffer-substring begin end)))
     (codegeex-debug-invoke prompt (codegeex-language) begin end)))
 
+;;;###autoload
 (defun codegeex-region-debug ()
   (interactive)
   (message "CodeGeeX debugging")
