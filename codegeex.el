@@ -31,6 +31,20 @@
 (require 'url)
 (require 'json)
 (require 'uuidgen)
+(require 'codegeex-completion)
+(require 'codegeex-overlay)
+
+
+(defcustom codegeex-idle-delay 0.5
+  "Time in seconds to wait before starting completion. Complete immediately if set to 0."
+  :type 'float
+  :group 'codegeex)
+
+(defcustom codegeex-clear-overlay-ignore-commands nil
+  "List of commands that should not clear the overlay when called."
+  :group 'codegeex
+  :type '(repeat function))
+
 
 (defvar codegeex-endpoint "https://tianqi.aminer.cn/api/v2/" "the endpoint of CodeGeeX API")
 (defvar codegeex-apikey "68cf004321e94b47a91c2e45a8109852" "API key obtained from CodeGeeX website")
@@ -40,47 +54,8 @@
 (defvar codegeex-top_k 0 "top_k for completion by CodeGeeX")
 (defvar codegeex-extinfo `((sid . ,(uuidgen-4))
                            (ide . "Emacs")
-                           (ideVersion . ,emacs-version)) "The ext field in JSON to be sent to server")
-
-(defun codegeex-completion-invoke (prefix suffix lang)
-  "Invoke CodeGeeX completion API.
-
-This function will complete code between PREFIX and SUFFIX, which are usually
-the content before cursor and after cursor, and put the result to the current
-buffer. LANG is the programming lanuauge of the code."
-  (let* ((url (concat codegeex-endpoint "multilingual_code_generate_adapt"))
-         (data (json-encode `((prompt . ,prefix)
-                              (suffix . ,suffix)
-                              (n . 1)
-                              (apikey . ,codegeex-apikey)
-                              (apisecret . ,codegeex-apisecret)
-                              (temperature . ,codegeex-temperature)
-                              (top_p . ,codegeex-top_p)
-                              (top_k . ,codegeex-top_k)
-                              (isFimEnabled . ,(not (equal suffix "")))
-                              (lang . ,lang)
-                              (ext . ,codegeex-extinfo))))
-         (url-request-method "POST")
-         (url-request-extra-headers
-          '(("Content-Type" . "application/json")))
-         (url-request-data data))
-    (url-retrieve
-     url
-     (lambda (status parent-buffer)
-       (goto-char (point-min))
-       (re-search-forward "^$")
-       (delete-region (point) (point-min))
-       (let* ((json-string (buffer-string))
-              (json-data (json-read-from-string json-string))
-              (json-result (assoc-default 'result json-data))
-              (json-output (assoc-default 'output json-result))
-              (json-code (assoc-default 'code json-output))
-              (result (aref json-code 0)))
-         (with-current-buffer parent-buffer
-           (insert result))
-         (kill-buffer)))
-     `(,(current-buffer))))
-  nil)
+                           (ideVersion . ,emacs-version))
+  "The ext field in JSON to be sent to server")
 
 (defun codegeex-debug-invoke (prompt lang begin end)
   "Invoke the codegeex debugger API.
@@ -126,16 +101,38 @@ buffer."
     name-without-mode))
 
 ;;;###autoload
-(defun codegeex-buffer-completion ()
-  "CodeGeeX buffer completion.
-
-The completion result will be put in the position of cursor directly."
+(defun codegeex-complete ()
+  "Get completion at point"
   (interactive)
-  (message "CodeGeeX completing")
-  (let ((prefix (buffer-substring (point-min) (point)))
-        (suffix (buffer-substring (point) (point-max))))
-    (codegeex-completion-invoke prefix suffix (codegeex-language)))
-  nil)
+  (codegeex-completion--get-completion
+   (lambda (completion)
+     (if completion
+         (codegeex-completion--show-completion completion)
+       (message "No completion available")))))
+
+;;;###autoload
+(defun codegeex-accept-completion (&optional transform-fn)
+  "Accept completion. Return t if there is a completion.
+Use TRANSFORM-FN to transform completion if provided."
+  (interactive)
+  (when (codegeex--overlay-visible)
+    (let* ((completion (overlay-get codegeex--overlay 'completion))
+           (start (overlay-get codegeex--overlay 'start))
+           (end (codegeex--overlay-end codegeex--overlay))
+           (uuid (overlay-get codegeex--overlay 'uuid))
+           (t-completion (funcall (or transform-fn #'identity) completion)))
+      (codegeex-clear-overlay)
+      (if (eq major-mode 'vterm-mode)
+          (progn
+            (vterm-delete-region start end)
+            (vterm-insert t-completion))
+        (delete-region start end)
+        (insert t-completion))
+      ;; if it is a partial completion
+      (when (and (s-prefix-p t-completion completion)
+                 (not (s-equals-p t-completion completion)))
+        (codegeex--set-overlay-text (codegeex--get-overlay) (s-chop-prefix t-completion completion)))
+      t)))
 
 ;;;###autoload
 (defun codegeex-buffer-debug ()
@@ -163,8 +160,126 @@ The result will be replaced into the selected region."
     (codegeex-debug-invoke prompt (codegeex-language) begin end))
   nil)
 
+;; minor mode
+
+(defvar codegeex--post-command-timer nil)
+
+(defcustom codegeex-disable-predicates nil
+  "A list of predicate functions with no argument to disable Codegeex.
+Codegeex will not be triggered if any predicate returns t."
+  :type '(repeat function)
+  :group 'codegeex)
+
+(defcustom codegeex-enable-predicates '(evil-insert-state-p codegeex--buffer-changed)
+  "A list of predicate functions with no argument to enable Codegeex.
+Codegeex will be triggered only if all predicates return t."
+  :type '(repeat function)
+  :group 'codegeex)
+
+(defcustom codegeex-disable-display-predicates nil
+  "A list of predicate functions with no argument to disable Codegeex.
+Codegeex will not show completions if any predicate returns t."
+  :type '(repeat function)
+  :group 'codegeex)
+
+(defcustom codegeex-enable-display-predicates nil
+  "A list of predicate functions with no argument to enable Codegeex.
+Codegeex will show completions only if all predicates return t."
+  :type '(repeat function)
+  :group 'codegeex)
+
+(defmacro codegeex--satisfy-predicates (enable disable)
+  "Return t if satisfy all predicates in ENABLE and none in DISABLE."
+  `(and (cl-every (lambda (pred)
+                    (if (functionp pred) (funcall pred) t))
+                  ,enable)
+        (cl-notany (lambda (pred)
+                     (if (functionp pred) (funcall pred) nil))
+                   ,disable)))
+
+(defun codegeex--satisfy-trigger-predicates ()
+  "Return t if all trigger predicates are satisfied."
+  (codegeex--satisfy-predicates codegeex-enable-predicates codegeex-disable-predicates))
+
+(defun codegeex--satisfy-display-predicates ()
+  "Return t if all display predicates are satisfied."
+  (codegeex--satisfy-predicates codegeex-enable-display-predicates codegeex-disable-display-predicates))
+
+(defvar codegeex-mode-map (make-sparse-keymap)
+  "Keymap for Codegeex minor mode.
+Use this for custom bindings in `codegeex-mode'.")
+
+(defun codegeex--mode-enter ()
+  "Set up codegeex mode when entering."
+  (add-hook 'post-command-hook #'codegeex--post-command nil 'local))
+
+(defun codegeex--mode-exit ()
+  "Clean up codegeex mode when exiting."
+  (remove-hook 'post-command-hook #'codegeex--post-command 'local))
+
 ;;;###autoload
-(define-key global-map (kbd "M-\\") 'codegeex-buffer-completion)
+(define-minor-mode codegeex-mode
+  "Minor mode for Codegeex."
+  :init-value nil
+  :lighter " Codegeex"
+  (codegeex-clear-overlay)
+  (advice-add 'posn-at-point :before-until #'codegeex--posn-advice)
+  (if codegeex-mode
+      (codegeex--mode-enter)
+    (codegeex--mode-exit)))
+
+(defun codegeex--posn-advice (&rest args)
+  "Remap posn if in codegeex-mode."
+  (when codegeex-mode
+    (let ((pos (or (car-safe args) (point))))
+      (when (and codegeex--real-posn
+                 (eq pos (car codegeex--real-posn)))
+        (cdr codegeex--real-posn)))))
+
+;;;###autoload
+(define-global-minor-mode global-codegeex-mode
+  codegeex-mode codegeex-mode)
+
+(defun codegeex--post-command ()
+  "Complete in `post-command-hook' hook."
+  (when (and this-command
+             (not (and (symbolp this-command)
+                       (or
+                        (s-starts-with-p "codegeex-" (symbol-name this-command))
+                        (member this-command codegeex-clear-overlay-ignore-commands)
+                        (codegeex--self-insert this-command)))))
+    (codegeex-clear-overlay)
+    (when codegeex--post-command-timer
+      (cancel-timer codegeex--post-command-timer))
+    (setq codegeex--post-command-timer
+          (run-with-idle-timer codegeex-idle-delay
+                               nil
+                               #'codegeex--post-command-debounce
+                               (current-buffer)))))
+
+(defun codegeex--self-insert (command)
+  "Handle the case where the char just inserted is the start of the completion.
+If so, update the overlays and continue. COMMAND is the
+command that triggered `post-command-hook'."
+  (when (and (eq command 'self-insert-command)
+             (codegeex--overlay-visible)
+             (codegeex--satisfy-display-predicates))
+    (let* ((ov codegeex--overlay)
+           (completion (overlay-get ov 'completion)))
+      ;; The char just inserted is the next char of completion
+      (when (eq last-command-event (elt completion 0))
+        (if (= (length completion) 1)
+            ;; If there is only one char in the completion, accept it
+            (codegeex-accept-completion)
+          (codegeex--set-overlay-text ov (substring completion 1)))))))
+
+(defun codegeex--post-command-debounce (buffer)
+  "Complete in BUFFER."
+  (when (and (buffer-live-p buffer)
+             (equal (current-buffer) buffer)
+             codegeex-mode
+             (codegeex--satisfy-trigger-predicates))
+    (codegeex-complete)))
 
 (provide 'codegeex)
 ;;; codegeex.el ends here
