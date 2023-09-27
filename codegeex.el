@@ -122,7 +122,7 @@ buffer."
   "Browse PLIST object for each KEYS and return the element
 where it stop.
 KEYS can be either numbers or properties symbols"
-  (let ((res json-result))
+  (let ((res plist))
     (dolist (key keys)
       (cond
        ((symbolp key)
