@@ -3,8 +3,9 @@
 ;; Copyright (C) 2023 Hao Zhang
 
 ;; Author: Hao Zhang <hzhangxyz@outlook.com>
+;; Contributor: Samuel Dawant <samueld@mailo.com>
 ;; Keywords: codegeex, completion
-;; Version: 0.0.1
+;; Version: 0.1.0
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -35,6 +36,12 @@
 (require 'codegeex-overlay)
 
 
+(defvar codegeex-json-string-cache nil
+  "Mainly for debugging but maybe will be useful")
+
+(defvar codegeex-response-cache nil
+  "Mainly for debugging but maybe will be useful")
+
 (defcustom codegeex-idle-delay 0.5
   "Time in seconds to wait before starting completion. Complete immediately if set to 0."
   :type 'float
@@ -45,13 +52,24 @@
   :group 'codegeex
   :type '(repeat function))
 
+(defvar codegeex-endpoint "https://tianqi.aminer.cn/api/v2/"
+  "the endpoint of CodeGeeX API")
 
-(defvar codegeex-endpoint "https://tianqi.aminer.cn/api/v2/" "the endpoint of CodeGeeX API")
-(defvar codegeex-apikey "68cf004321e94b47a91c2e45a8109852" "API key obtained from CodeGeeX website")
-(defvar codegeex-apisecret "e82b86a16f9d471ab215f653060310e3" "API secret obtained from CodeGeeX website")
-(defvar codegeex-temperature 0.2 "temperature for completion by CodeGeeX")
-(defvar codegeex-top_p 0.95 "top_p for completion by CodeGeeX")
-(defvar codegeex-top_k 0 "top_k for completion by CodeGeeX")
+(defvar codegeex-apikey "68cf004321e94b47a91c2e45a8109852"
+  "API key obtained from CodeGeeX website")
+
+(defvar codegeex-apisecret "e82b86a16f9d471ab215f653060310e3"
+  "API secret obtained from CodeGeeX website")
+
+(defvar codegeex-temperature 0.2
+  "temperature for completion by CodeGeeX")
+
+(defvar codegeex-top_p 0.95
+  "top_p for completion by CodeGeeX")
+
+(defvar codegeex-top_k 0
+  "top_k for completion by CodeGeeX")
+
 (defvar codegeex-extinfo `((sid . ,(uuidgen-4))
                            (ide . "Emacs")
                            (ideVersion . ,emacs-version))
@@ -100,15 +118,56 @@ buffer."
          (name-without-mode (replace-regexp-in-string "-mode" "" name)))
     name-without-mode))
 
+(defun codegeex--plist-get (plist &rest keys)
+  "Browse PLIST object for each KEYS and return the element
+where it stop.
+KEYS can be either numbers or properties symbols"
+  (let ((res json-result))
+    (dolist (key keys)
+      (cond
+       ((symbolp key)
+        (setq res (plist-get res key)))
+       ((numberp key)
+        (setq res (nth key res)))
+       (t
+        (error "Key '%s' format not supported" key))))
+    res))
+
+(defvar-local codegeex--completion-cache nil)
+(defvar-local codegeex--completion-idx 0)
+
 ;;;###autoload
 (defun codegeex-complete ()
-  "Get completion at point"
+  "Get completion at point, showing the completion in an overlay"
+  (interactive)
+  (setq codegeex--completion-cache nil)
+  (codegeex-completion--get-completion
+   (lambda (json-result)
+     (let* ((completions
+             (cl-remove-if
+              (lambda (e)
+                (string= "" (string-trim e)))
+              (cl-remove-duplicates
+               (codegeex--plist-get
+                json-result :result :output :code))))
+           (completion (if (seq-empty-p completions) nil (seq-elt completions 0))))
+       (setq codegeex--completion-cache completions)
+       (if completion
+           (codegeex-completion--show-completion completion)
+         (message "No completion available"))))))
+
+;;;###autoload
+(defun codegeex-complete-at-point ()
+  "Get first completion proposed and insert it at point
+Can be used without having to be in `codegeex-mode'"
   (interactive)
   (codegeex-completion--get-completion
-   (lambda (completion)
-     (if completion
-         (codegeex-completion--show-completion completion)
-       (message "No completion available")))))
+   (lambda (json-result)
+     (let ((completion (codegeex--plist-get
+                        json-result :result :output :code 0)))
+       (if completion
+         (insert completion)
+       (message "No completion available"))))))
 
 ;;;###autoload
 (defun codegeex-accept-completion (&optional transform-fn)
@@ -133,6 +192,31 @@ Use TRANSFORM-FN to transform completion if provided."
                  (not (s-equals-p t-completion completion)))
         (codegeex--set-overlay-text (codegeex--get-overlay) (s-chop-prefix t-completion completion)))
       t)))
+
+(defun codegeex--cycle-completion (direction)
+  "Cycle completion with DIRECTION."
+  (let ((completions codegeex--completion-cache))
+    (cond ((seq-empty-p completions)
+           (message "No completion is available."))
+          ((= (length completions) 1)
+           (message "Only one completion is available."))
+          (t (let ((idx (mod (+ codegeex--completion-idx direction)
+                             (length completions))))
+               (setq codegeex--completion-idx idx)
+               (let ((completion (elt completions idx)))
+                 (codegeex-completion--show-completion completion)))))))
+
+(defun codegeex-next-completion ()
+  "Cycle to next completion."
+  (interactive)
+  (when (codegeex--overlay-visible)
+    (codegeex--cycle-completion 1)))
+
+(defun codegeex-previous-completion ()
+  "Cycle to previous completion."
+  (interactive)
+  (when (codegeex--overlay-visible)
+    (codegeex--cycle-completion -1)))
 
 ;;;###autoload
 (defun codegeex-buffer-debug ()

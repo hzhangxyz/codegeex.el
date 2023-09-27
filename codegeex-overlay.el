@@ -71,15 +71,10 @@ To work around posn problems with after-string property.")
     (overlay-put ov 'completion completion)
     (overlay-put ov 'start (point))))
 
-(defun codegeex--display-overlay-completion-1 (completion start end)
-  ;; Create overlay and set its text.
-  )
-
 (defun codegeex--display-overlay-completion (completion start end)
   "Show COMPLETION between START and END."
   (setq end start)
   (codegeex-clear-overlay)
-  (message "%s %d %d" completion start end)
   (when (and (s-present-p completion)
              (or (= start (point))      ; up-to-date completion
                  (and (< start (point)) ; special case for removing indentation

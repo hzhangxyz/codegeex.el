@@ -38,9 +38,7 @@ CALLBACK is launched with the content of the buffer."
     (codegeex-api--url-retrieve url data callback)))
 
 (defun codegeex-api--url-retrieve (url json-data callback)
-  "Default url retrieve as POST with json data
-
-TODO : CALLBACK takes a json plist as argument"
+  "Default url retrieve as POST with json data"
   (let ((url-request-method "POST")
         (url-request-extra-headers
          '(("Content-Type" . "application/json")))
@@ -49,40 +47,42 @@ TODO : CALLBACK takes a json plist as argument"
      url
      (lambda (status init-buffer callback)
        (let ((result (codegeex-api--get-json-result)))
+         (setq codegeex-response-cache result)
          (with-current-buffer init-buffer
            (funcall callback result))))
      `(,(current-buffer) ,callback) t)))
 
 (defun codegeex-api--get-json-result ()
-  "Get the code string from the json response
-TODO: Create a plist with the json response to avoid that
-kind of shit"
+  "Get the code string from the json response"
   (goto-char (point-min))
   (re-search-forward "^$")
-  (aref
-   (assoc-default
-    'code
-    (assoc-default
-     'output
-     (assoc-default
-      'result
-      (json-read-from-string
-       (buffer-substring (point) (point-max))))))
-   0))
+  (let ((json-string (buffer-substring (point) (point-max))))
+    (setq codegeex-json-string-cache json-string)
+    (json-parse-string json-string
+                       :object-type 'plist
+                       :array-type 'list)))
 
 (defun codegeex-api--generate-json-data (prefix suffix lang)
   "Create Json-encoded data to send to codegeex API"
-  (json-encode `((prompt . ,prefix)
-                 (suffix . ,suffix)
-                 (n . 1)
-                 (apikey . ,codegeex-apikey)
-                 (apisecret . ,codegeex-apisecret)
-                 (temperature . ,codegeex-temperature)
-                 (top_p . ,codegeex-top_p)
-                 (top_k . ,codegeex-top_k)
-                 (isFimEnabled . ,(not (equal suffix "")))
-                 (lang . ,lang)
-                 (ext . ,codegeex-extinfo))))
+  (let ((n-factor
+         (cond
+          ((<= (length prefix) 300) 3)
+          ((> (length prefix) 600) 2)
+          ((> (length prefix) 900) 1))))
+    (when (> (length prefix) 1200 )
+      (setq prefix (substring prefix 0 1200)))
+    (json-encode
+     `(:prompt ,prefix
+               :suffix ,suffix
+               :n ,n-factor
+               :apikey ,codegeex-apikey
+               :apisecret ,codegeex-apisecret
+               :temperature ,codegeex-temperature
+               :top_p ,codegeex-top_p
+               :top_k ,codegeex-top_k
+               :isFimEnabled ,(not (equal suffix ""))
+               :lang ,lang
+               :ext ,codegeex-extinfo))))
 
 (provide 'codegeex-api)
 ;;; codegeex-api.el ends here

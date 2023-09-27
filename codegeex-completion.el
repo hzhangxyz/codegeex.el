@@ -27,20 +27,19 @@
 (require 'codegeex-api)
 (require 'codegeex-overlay)
 
-(defun codegeex-completion--show-completion (completion-string)
+(defun codegeex-completion--show-completion (completion)
   (save-excursion
     (save-restriction
       (widen)
       (let* ((p (point))
              (start p)
-             (end (+ p (length completion-string))))
+             (end (+ p (length completion))))
         (codegeex--display-overlay-completion
-         completion-string start end)))))
-
+         completion start end)))))
 
 (defun codegeex-completion--get-completion (callback)
   "Retrieve context (prefix and suffix) and language and invoke `codegeex-api--get-completion'
-CALLBACK is launched with result of the call"
+CALLBACK is launched with json result of the call"
   (let ((prefix (buffer-substring (point-min) (point)))
         (suffix (buffer-substring (point) (point-max)))
         (language (codegeex-language)))
