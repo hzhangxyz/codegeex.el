@@ -69,8 +69,8 @@ CALLBACK is launched with the content of the buffer."
           ((<= (length prefix) 300) 3)
           ((> (length prefix) 600) 2)
           ((> (length prefix) 900) 1))))
-    (when (> (length prefix) 1200 )
-      (setq prefix (substring prefix 0 1200)))
+    (when (> (length prefix) 5000 )
+      (setq prefix (substring prefix -5000)))
     (json-encode
      `(:prompt ,prefix
                :suffix ,suffix
