@@ -43,6 +43,7 @@ CALLBACK is launched with the content of the buffer."
         (url-request-extra-headers
          '(("Content-Type" . "application/json")))
         (url-request-data json-data))
+    (setq codegeex-request-cache json-data)
     (url-retrieve
      url
      (lambda (status init-buffer callback)

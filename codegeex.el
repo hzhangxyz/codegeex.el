@@ -39,6 +39,9 @@
 (defvar codegeex-json-string-cache nil
   "Mainly for debugging but maybe will be useful")
 
+(defvar codegeex-request-cache nil
+  "Mainly for debugging but maybe will be useful")
+
 (defvar codegeex-response-cache nil
   "Mainly for debugging but maybe will be useful")
 
