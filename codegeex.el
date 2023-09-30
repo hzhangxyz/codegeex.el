@@ -159,6 +159,59 @@ KEYS can be either numbers or properties symbols"
            (codegeex-completion--show-completion completion)
          (message "No completion available"))))))
 
+(defun codegeex--cycle-completion (direction)
+  "Cycle completion with DIRECTION."
+  (let ((completions codegeex--completion-cache))
+    (cond ((seq-empty-p completions)
+           (message "No completion is available."))
+          ((= (length completions) 1)
+           (message "Only one completion is available."))
+          (t (let ((idx (mod (+ codegeex--completion-idx direction)
+                             (length completions))))
+               (setq codegeex--completion-idx idx)
+               (let ((completion (elt completions idx)))
+                 (codegeex-completion--show-completion completion)))))))
+
+;;;###autoload
+(defun codegeex-next-completion ()
+  "Cycle to next completion."
+  (interactive)
+  (when (codegeex--overlay-visible)
+    (codegeex--cycle-completion 1)))
+
+;;;###autoload
+(defun codegeex-previous-completion ()
+  "Cycle to previous completion."
+  (interactive)
+  (when (codegeex--overlay-visible)
+    (codegeex--cycle-completion -1)))
+
+;;;###autoload
+(defun codegeex-buffer-debug ()
+  "CodeGeeX debugging for the current buffer.
+
+The result will be replaced into the buffer directly."
+  (interactive)
+  (message "CodeGeeX debugging")
+  (let* ((begin (point-min))
+         (end (point-max))
+         (prompt (buffer-substring begin end)))
+    (codegeex-debug-invoke prompt (codegeex-language) begin end))
+  nil)
+
+;;;###autoload
+(defun codegeex-region-debug ()
+  "CodeGeeX debugging of region.
+
+The result will be replaced into the selected region."
+  (interactive)
+  (message "CodeGeeX debugging")
+  (let* ((begin (region-beginning))
+         (end (region-end))
+         (prompt (buffer-substring begin end)))
+    (codegeex-debug-invoke prompt (codegeex-language) begin end))
+  nil)
+
 ;;;###autoload
 (defun codegeex-complete-at-point ()
   "Get first completion proposed and insert it at point
@@ -195,57 +248,6 @@ Use TRANSFORM-FN to transform completion if provided."
                  (not (s-equals-p t-completion completion)))
         (codegeex--set-overlay-text (codegeex--get-overlay) (s-chop-prefix t-completion completion)))
       t)))
-
-(defun codegeex--cycle-completion (direction)
-  "Cycle completion with DIRECTION."
-  (let ((completions codegeex--completion-cache))
-    (cond ((seq-empty-p completions)
-           (message "No completion is available."))
-          ((= (length completions) 1)
-           (message "Only one completion is available."))
-          (t (let ((idx (mod (+ codegeex--completion-idx direction)
-                             (length completions))))
-               (setq codegeex--completion-idx idx)
-               (let ((completion (elt completions idx)))
-                 (codegeex-completion--show-completion completion)))))))
-
-(defun codegeex-next-completion ()
-  "Cycle to next completion."
-  (interactive)
-  (when (codegeex--overlay-visible)
-    (codegeex--cycle-completion 1)))
-
-(defun codegeex-previous-completion ()
-  "Cycle to previous completion."
-  (interactive)
-  (when (codegeex--overlay-visible)
-    (codegeex--cycle-completion -1)))
-
-;;;###autoload
-(defun codegeex-buffer-debug ()
-  "CodeGeeX debugging for the current buffer.
-
-The result will be replaced into the buffer directly."
-  (interactive)
-  (message "CodeGeeX debugging")
-  (let* ((begin (point-min))
-         (end (point-max))
-         (prompt (buffer-substring begin end)))
-    (codegeex-debug-invoke prompt (codegeex-language) begin end))
-  nil)
-
-;;;###autoload
-(defun codegeex-region-debug ()
-  "CodeGeeX debugging of region.
-
-The result will be replaced into the selected region."
-  (interactive)
-  (message "CodeGeeX debugging")
-  (let* ((begin (region-beginning))
-         (end (region-end))
-         (prompt (buffer-substring begin end)))
-    (codegeex-debug-invoke prompt (codegeex-language) begin end))
-  nil)
 
 ;; minor mode
 
@@ -304,17 +306,6 @@ Use this for custom bindings in `codegeex-mode'.")
   "Clean up codegeex mode when exiting."
   (remove-hook 'post-command-hook #'codegeex--post-command 'local))
 
-;;;###autoload
-(define-minor-mode codegeex-mode
-  "Minor mode for Codegeex."
-  :init-value nil
-  :lighter " Codegeex"
-  (codegeex-clear-overlay)
-  (advice-add 'posn-at-point :before-until #'codegeex--posn-advice)
-  (if codegeex-mode
-      (codegeex--mode-enter)
-    (codegeex--mode-exit)))
-
 (defun codegeex--posn-advice (&rest args)
   "Remap posn if in codegeex-mode."
   (when codegeex-mode
@@ -322,10 +313,6 @@ Use this for custom bindings in `codegeex-mode'.")
       (when (and codegeex--real-posn
                  (eq pos (car codegeex--real-posn)))
         (cdr codegeex--real-posn)))))
-
-;;;###autoload
-(define-global-minor-mode global-codegeex-mode
-  codegeex-mode codegeex-mode)
 
 (defun codegeex--post-command ()
   "Complete in `post-command-hook' hook."
@@ -367,6 +354,21 @@ command that triggered `post-command-hook'."
              codegeex-mode
              (codegeex--satisfy-trigger-predicates))
     (codegeex-complete)))
+
+;;;###autoload
+(define-global-minor-mode global-codegeex-mode
+  codegeex-mode codegeex-mode)
+
+;;;###autoload
+(define-minor-mode codegeex-mode
+  "Minor mode for Codegeex."
+  :init-value nil
+  :lighter " Codegeex"
+  (codegeex-clear-overlay)
+  (advice-add 'posn-at-point :before-until #'codegeex--posn-advice)
+  (if codegeex-mode
+      (codegeex--mode-enter)
+    (codegeex--mode-exit)))
 
 (provide 'codegeex)
 ;;; codegeex.el ends here
