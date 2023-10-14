@@ -139,6 +139,7 @@ KEYS can be either numbers or properties symbols"
 
 (defvar-local codegeex--completion-cache nil)
 (defvar-local codegeex--completion-idx 0)
+(defvar-local codegeex--last-pos nil)
 
 (defun codegeex-completion--show-completion (completion)
   (save-excursion
@@ -164,20 +165,22 @@ CALLBACK is launched with json result of the call"
   "Get completion at point, showing the completion in an overlay"
   (interactive)
   (setq codegeex--completion-cache nil)
+  (setq codegeex--last-pos (point))
   (codegeex-completion--get-completion
    (lambda (json-result)
-     (let* ((completions
-             (cl-remove-if
-              (lambda (e)
-                (string= "" (string-trim e)))
-              (cl-remove-duplicates
-               (codegeex--plist-get
-                json-result :result :output :code))))
-           (completion (if (seq-empty-p completions) nil (seq-elt completions 0))))
-       (setq codegeex--completion-cache completions)
-       (if completion
-           (codegeex-completion--show-completion completion)
-         (message "No completion available"))))))
+     (when (equal (point) codegeex--last-pos)
+       (let* ((completions
+               (cl-remove-if
+                (lambda (e)
+                  (string= "" (string-trim e)))
+                (cl-remove-duplicates
+                 (codegeex--plist-get
+                  json-result :result :output :code))))
+              (completion (if (seq-empty-p completions) nil (seq-elt completions 0))))
+         (setq codegeex--completion-cache completions)
+         (if completion
+             (codegeex-completion--show-completion completion)
+           (message "No completion available")))))))
 
 (defun codegeex--cycle-completion (direction)
   "Cycle completion with DIRECTION."
