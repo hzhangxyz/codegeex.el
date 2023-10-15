@@ -32,7 +32,6 @@
 (require 'url)
 (require 'json)
 (require 'uuidgen)
-(require 'codegeex-completion)
 (require 'codegeex-api)
 (require 'codegeex-overlay)
 
