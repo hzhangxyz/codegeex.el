@@ -29,12 +29,12 @@
 
 ;;; Code:
 
+(require 's)
 (require 'url)
 (require 'json)
 (require 'uuidgen)
 (require 'codegeex-api)
 (require 'codegeex-overlay)
-
 
 (defvar codegeex-json-string-cache nil
   "Mainly for debugging but maybe will be useful")
